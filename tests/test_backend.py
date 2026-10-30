@@ -33,6 +33,33 @@ class BackendTests(unittest.TestCase):
         self.tools.edit('a.txt', 'second', 'changed')
         self.assertEqual((self.root/'a.txt').read_bytes(), b'first\r\nchanged\r\n')
 
+    def test_missing_file_error_is_actionable(self):
+        for name, args in [('read', {'path': 'missing.txt'}),
+                           ('edit', {'path': 'missing.txt', 'old': 'a', 'new': 'b'})]:
+            with self.subTest(tool=name):
+                with self.assertRaisesRegex(ValueError, '文件不存在：missing.txt'):
+                    self.tools.call(name, args)
+                self.assertFalse((self.root/'missing.txt').exists())
+
+    def test_directory_is_not_treated_as_file(self):
+        (self.root/'folder').mkdir()
+        for name, args in [('read', {'path': 'folder'}),
+                           ('edit', {'path': 'folder', 'old': 'a', 'new': 'b'})]:
+            with self.subTest(tool=name):
+                with self.assertRaisesRegex(ValueError, '这是目录'):
+                    self.tools.call(name, args)
+        self.assertTrue((self.root/'folder').is_dir())
+
+    def test_invalid_encoding_preserves_original_bytes(self):
+        original = b'\xff\xfe\x00\x80'
+        (self.root/'binary.dat').write_bytes(original)
+        for name, args in [('read', {'path': 'binary.dat'}),
+                           ('edit', {'path': 'binary.dat', 'old': 'a', 'new': 'b'})]:
+            with self.subTest(tool=name):
+                with self.assertRaisesRegex(ValueError, '请先确认文件编码或类型'):
+                    self.tools.call(name, args)
+                self.assertEqual((self.root/'binary.dat').read_bytes(), original)
+
     def test_traversal_and_secret_rejected(self):
         for path in ('../outside.txt', '.env', '.git/config', '.env.local'):
             with self.assertRaises(ValueError):

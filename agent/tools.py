@@ -24,7 +24,7 @@ class Tools:
         return p
 
     def read(self, path, offset=1, limit=200):
-        p = self.path(path)
+        p = self._existing_text_path(path)
         if type(offset) is not int or type(limit) is not int or offset < 1 or not 1 <= limit <= 500:
             raise ValueError('offset 从 1 开始，limit 范围 1–500')
         mime = mimetypes.guess_type(p.name)[0] or ''
@@ -35,7 +35,7 @@ class Tools:
             return [{'type': 'image_url', 'image_url': {'url': f'data:{mime};base64,{data}'}}]
         if p.stat().st_size > 10_000_000:
             raise ValueError('文本超过 10MB，请先用命令筛选')
-        lines = p.read_text(encoding='utf-8-sig').splitlines()
+        lines = self._read_text(p, path, encoding='utf-8-sig').splitlines()
         selected = lines[offset - 1:offset - 1 + limit]
         return {'path': path, 'total_lines': len(lines),
                 'remaining_lines': max(0, len(lines) - (offset - 1 + len(selected))),
@@ -61,15 +61,30 @@ class Tools:
         return self._change(path, before, content)
 
     def edit(self, path, old, new):
-        p = self.path(path)
-        with p.open(encoding='utf-8', newline='') as f:
-            before = f.read()
+        p = self._existing_text_path(path)
+        before = self._read_text(p, path)
         count = before.count(old) if old else 0
         if count != 1:
             raise ValueError(f'旧内容出现 {count} 次，必须恰好一次；请读取文件后补充上下文')
         after = before.replace(old, new, 1)
         self._save(p, after)
         return self._change(path, before, after)
+
+    def _existing_text_path(self, path):
+        p = self.path(path)
+        if not p.exists():
+            raise ValueError(f'文件不存在：{path}；请先确认文件名或列出项目文件')
+        if not p.is_file():
+            raise ValueError(f'这是目录，不是文件：{path}；请提供具体文件路径')
+        return p
+
+    @staticmethod
+    def _read_text(p, path, encoding='utf-8'):
+        try:
+            with p.open(encoding=encoding, newline='') as f:
+                return f.read()
+        except UnicodeDecodeError:
+            raise ValueError(f'无法按 UTF-8 读取：{path}；请先确认文件编码或类型，不要直接覆盖') from None
 
     @staticmethod
     def _change(path, before, after):
