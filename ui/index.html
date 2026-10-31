@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desktop Agent</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:#202b3c;font:15px 'Microsoft YaHei',sans-serif}header{height:90px;padding:18px 24px;background:white;border-bottom:1px solid #d9e0e9}h1{font-size:23px;margin:0 0 8px}#workspace{color:#53647b;font-size:13px}main{display:grid;grid-template-columns:230px minmax(300px,1fr) 320px;height:calc(100vh - 90px)}section{min-width:0;overflow:auto;border-right:1px solid #d9e0e9;padding:16px}h2{font-size:15px;margin:0 0 16px}button{display:block;width:100%;text-align:left;border:0;padding:10px;background:transparent;cursor:pointer;overflow-wrap:anywhere;color:#263e5e}button:hover,button.active{background:#dfeafa;border-radius:5px}pre{font:14px/1.7 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}p{line-height:1.8;color:#52637b}.error{color:#b42318}#remaining{color:#53647b}textarea{width:100%;padding:10px;height:100px}button:disabled{cursor:default;color:#777;background:#e3e7ed}
+</style>
+<header><h1>Desktop Agent</h1><div id="workspace">正在连接桌面窗口…</div></header>
+<main><section><h2>项目文件</h2><nav id="files"></nav></section><section><h2 id="filename">选择文件查看内容</h2><pre id="code">左侧点击文件，查看带行号的代码。</pre><p id="remaining"></p></section><section><h2>助手</h2><p>当前为正式界面的第一阶段：文件列表和只读预览。</p><p>对话与工具事件将在后续接入。已有功能仍可通过原型窗口使用。</p><textarea disabled placeholder="对话功能尚未接入"></textarea><button disabled>发送任务（尚未接入）</button><p id="status" role="status"></p></section></main>
+<script>
+const el=id=>document.getElementById(id);
+window.addEventListener('pywebviewready',async()=>{
+ try{
+  const data=await window.pywebview.api.files();el('workspace').textContent=data.workspace;
+  for(const path of data.files){const b=document.createElement('button');b.textContent=path;
+   b.onclick=async()=>{try{const r=await window.pywebview.api.read(path);el('filename').textContent=path;el('code').textContent=r.error||r.text;el('code').className=r.error?'error':'';el('remaining').textContent=r.remaining_lines?`还有 ${r.remaining_lines} 行未展示`:'';document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');}catch(e){el('status').textContent='预览失败，请重试';}};
+   el('files').appendChild(b);
+  }el('status').textContent=`已列出 ${data.files.length} 个文件（最多300个）`;
+ }catch(e){el('status').textContent='无法读取项目文件';}
+});
+</script></html>
