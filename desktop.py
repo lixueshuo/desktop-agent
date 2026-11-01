@@ -1,6 +1,9 @@
 """正式界面第一阶段：文件列表与只读预览。"""
 from pathlib import Path
 import sys
+import queue
+import threading
+from agent.runtime import run
 from agent.tools import Tools
 
 ROOT = Path(__file__).resolve().parent
@@ -10,6 +13,44 @@ sys.path.insert(0, str(ROOT / '.desktop-deps'))
 class FileApi:
     def __init__(self, workspace=None):
         self.workspace = Path(workspace or ROOT / 'examples' / 'practice').resolve()
+        self._events = queue.Queue()
+        self._cancel = threading.Event()
+        self._lock = threading.Lock()
+        self._busy = False
+
+    def start_task(self, task):
+        if not isinstance(task, str) or not task.strip() or len(task) > 20000:
+            return {'error': '请输入 1–20000 字符的任务'}
+        with self._lock:
+            if self._busy:
+                return {'error': '已有任务运行，请等待结束'}
+            self._busy = True
+            self._cancel = threading.Event()
+        def worker():
+            try:
+                for event in run(task, self.workspace, self._cancel):
+                    self._events.put(event)
+            except Exception as e:
+                self._events.put({'type': 'error', 'text': str(e)})
+            finally:
+                with self._lock:
+                    self._events.put({'type': 'finished'})
+                    self._busy = False
+        threading.Thread(target=worker, daemon=True).start()
+        return {'started': True}
+
+    def poll_events(self):
+        events = []
+        for _ in range(100):
+            try:
+                events.append(self._events.get_nowait())
+            except queue.Empty:
+                break
+        return events
+
+    def cancel_task(self):
+        self._cancel.set()
+        return {'requested': True}
 
     def files(self):
         items = []

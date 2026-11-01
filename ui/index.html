@@ -5,11 +5,12 @@
 *{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:#202b3c;font:15px 'Microsoft YaHei',sans-serif}header{height:90px;padding:18px 24px;background:white;border-bottom:1px solid #d9e0e9}h1{font-size:23px;margin:0 0 8px}#workspace{color:#53647b;font-size:13px}main{display:grid;grid-template-columns:230px minmax(300px,1fr) 320px;height:calc(100vh - 90px)}section{min-width:0;overflow:auto;border-right:1px solid #d9e0e9;padding:16px}h2{font-size:15px;margin:0 0 16px}button{display:block;width:100%;text-align:left;border:0;padding:10px;background:transparent;cursor:pointer;overflow-wrap:anywhere;color:#263e5e}button:hover,button.active{background:#dfeafa;border-radius:5px}pre{font:14px/1.7 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}p{line-height:1.8;color:#52637b}.error{color:#b42318}#remaining{color:#53647b}textarea{width:100%;padding:10px;height:100px}button:disabled{cursor:default;color:#777;background:#e3e7ed}
 </style>
 <header><h1>Desktop Agent</h1><div id="workspace">正在连接桌面窗口…</div></header>
-<main><section><h2>项目文件</h2><nav id="files"></nav></section><section><h2 id="filename">选择文件查看内容</h2><pre id="code">左侧点击文件，查看带行号的代码。</pre><p id="remaining"></p></section><section><h2>助手</h2><p>当前为正式界面的第一阶段：文件列表和只读预览。</p><p>对话与工具事件将在后续接入。已有功能仍可通过原型窗口使用。</p><textarea disabled placeholder="对话功能尚未接入"></textarea><button disabled>发送任务（尚未接入）</button><p id="status" role="status"></p></section></main>
+<main><section><h2>项目文件</h2><nav id="files"></nav></section><section><h2 id="filename">选择文件查看内容</h2><pre id="code">左侧点击文件，查看带行号的代码。</pre><p id="remaining"></p></section><section><h2>助手</h2><p>输入任务后，实际工具调用和修改差异会显示在下方。</p><textarea id="task" placeholder="例如：检查 stats.py 并运行测试"></textarea><button id="send" disabled>发送任务</button><button id="stop" disabled>中断</button><div id="events" aria-live="polite"></div><p id="status" role="status"></p></section></main>
 <script>
 const el=id=>document.getElementById(id);
 window.addEventListener('pywebviewready',async()=>{
  try{
+  el('send').disabled=false;
   const data=await window.pywebview.api.files();el('workspace').textContent=data.workspace;
   for(const path of data.files){const b=document.createElement('button');b.textContent=path;
    b.onclick=async()=>{try{const r=await window.pywebview.api.read(path);el('filename').textContent=path;el('code').textContent=r.error||r.text;el('code').className=r.error?'error':'';el('remaining').textContent=r.remaining_lines?`还有 ${r.remaining_lines} 行未展示`:'';document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');}catch(e){el('status').textContent='预览失败，请重试';}};
@@ -17,4 +18,23 @@ window.addEventListener('pywebviewready',async()=>{
   }el('status').textContent=`已列出 ${data.files.length} 个文件（最多300个）`;
  }catch(e){el('status').textContent='无法读取项目文件';}
 });
+
+let polling=false;
+function record(text,error=false){const p=document.createElement('pre');p.textContent=text;if(error)p.className='error';el('events').appendChild(p);p.scrollIntoView({block:'nearest'});}
+el('send').onclick=async()=>{
+ el('send').disabled=true;
+ try{const r=await window.pywebview.api.start_task(el('task').value);if(r.error){record(r.error,true);el('send').disabled=false;return;}record('你：'+el('task').value);el('stop').disabled=false;el('status').textContent='运行中…';}
+ catch(e){record('启动失败，请重试',true);el('send').disabled=false;}
+};
+el('stop').onclick=async()=>{await window.pywebview.api.cancel_task();el('stop').disabled=true;el('status').textContent='已请求中断；模型请求最多等待60秒，期间不再执行新工具';};
+setInterval(async()=>{
+ if(polling||!window.pywebview)return;polling=true;
+ try{for(const e of await window.pywebview.api.poll_events()){
+  if(e.type==='tool_start')record('调用 '+e.name+'：'+e.arguments);
+  if(e.type==='tool_result'){const r=e.result;record(typeof r==='object'?(r.error||r.diff||r.text||JSON.stringify(r,null,2)):String(r),e.error);}
+  if(e.type==='done')record('助手回复：'+e.text);
+  if(e.type==='error'||e.type==='cancelled')record(e.text||'已中断',true);
+  if(e.type==='finished'){el('send').disabled=false;el('stop').disabled=true;el('status').textContent='本次运行已结束';}
+ }}catch(e){el('status').textContent='事件连接失败，请重新打开窗口';}finally{polling=false;}
+},200);
 </script></html>
