@@ -51,7 +51,41 @@ SYSTEM = '''你是本地编程助手。先读取相关文件，再做最小修�
 失败应说明证据和原因。回答使用中文。'''
 
 
-def run(task, workspace, cancel=None, model=chat, max_steps=12):
+def run(task, workspace, cancel=None, model=chat, max_steps=12, trace_dir=None):
+    from .trace import Trace
+    trace = None
+    try:
+        trace = Trace(trace_dir or ROOT / '.runs', [config().get('DEEPSEEK_API_KEY', '')])
+        trace.add({'type': 'start', 'task': task, 'workspace': str(workspace),
+                   'model_mode': 'live' if model is chat else 'test-double'})
+    except OSError:
+        if trace:
+            trace.close()
+        trace = None
+        yield {'type': 'trace_warning', 'text': '无法保存运行记录，本次任务仍继续'}
+    try:
+        for event in _run(task, workspace, cancel, model, max_steps):
+            if trace:
+                try:
+                    trace.add(event)
+                except OSError:
+                    trace.close()
+                    trace = None
+                    yield {'type': 'trace_warning', 'text': '运行记录写入失败，本次任务仍继续'}
+            yield event
+    except Exception as e:
+        if trace:
+            try:
+                trace.add({'type': 'error', 'text': str(e)})
+            except OSError:
+                pass
+        raise
+    finally:
+        if trace:
+            trace.close()
+
+
+def _run(task, workspace, cancel=None, model=chat, max_steps=12):
     cancel = cancel or threading.Event()
     tools = Tools(workspace, cancel)
     messages = [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': task}]

@@ -33,6 +33,7 @@ setInterval(async()=>{
   if(e.type==='tool_start')record('调用 '+e.name+'：'+e.arguments);
   if(e.type==='tool_result'){const r=e.result;record(typeof r==='object'?(r.error||r.diff||r.text||JSON.stringify(r,null,2)):String(r),e.error);}
   if(e.type==='done')record('助手回复：'+e.text);
+  if(e.type==='trace_warning')record(e.text,true);
   if(e.type==='error'||e.type==='cancelled')record(e.text||'已中断',true);
   if(e.type==='finished'){el('send').disabled=false;el('stop').disabled=true;el('status').textContent='本次运行已结束';}
  }}catch(e){el('status').textContent='事件连接失败，请重新打开窗口';}finally{polling=false;}
