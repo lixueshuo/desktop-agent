@@ -1,0 +1,4 @@
+{
+  "enabled": true,
+  "command": ["${python}", "${root}/examples/mcp_server.py"]
+}

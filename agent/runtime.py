@@ -1,17 +1,21 @@
 import json
 import os
+import sys
 from pathlib import Path
 import threading
 import urllib.request
 import urllib.error
 from .tools import Tools, SCHEMAS
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1]))
+DATA = Path.home() / 'DesktopAgent' if getattr(sys, 'frozen', False) else ROOT
+DATA.mkdir(parents=True, exist_ok=True)
+_local = threading.local()
 
 
 def config():
     result = {}
-    path = ROOT / '.env'
+    path = DATA / '.env'
     if path.exists():
         for line in path.read_text(encoding='utf-8-sig').splitlines():
             if '=' in line and not line.lstrip().startswith('#'):
@@ -28,7 +32,7 @@ def chat(messages):
     if not cfg.get('DEEPSEEK_API_KEY'):
         raise RuntimeError('请先在本地 .env 填写 DEEPSEEK_API_KEY')
     body = {'model': cfg.get('DEEPSEEK_MODEL', 'deepseek-flash'), 'messages': messages,
-            'tools': SCHEMAS, 'max_tokens': 4096, 'thinking': {'type': 'disabled'}}
+            'tools': getattr(_local, 'schemas', SCHEMAS), 'max_tokens': 4096, 'thinking': {'type': 'disabled'}}
     request = urllib.request.Request(cfg.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com').rstrip('/') + '/chat/completions',
               data=json.dumps(body).encode(), headers={'Content-Type': 'application/json',
               'Authorization': 'Bearer ' + cfg['DEEPSEEK_API_KEY']})
@@ -54,8 +58,31 @@ SYSTEM = '''你是本地编程助手。先读取相关文件，再做最小修�
 def run(task, workspace, cancel=None, model=chat, max_steps=12, trace_dir=None):
     from .trace import Trace
     trace = None
+    mcp = None
+    _local.schemas = list(SCHEMAS)
+    _local.mcp = None
     try:
-        trace = Trace(trace_dir or ROOT / '.runs', [config().get('DEEPSEEK_API_KEY', '')])
+        cfg_path = ROOT / 'mcp.json'
+        if cfg_path.exists():
+            import sys
+            from .mcp_client import McpClient
+            cfg = json.loads(cfg_path.read_text(encoding='utf-8-sig'))
+            if cfg.get('enabled'):
+                command = ([sys.executable, '--mcp-server'] if getattr(sys, 'frozen', False)
+                           else [sys.executable if s == '${python}' else s.replace('${root}', str(ROOT)) for s in cfg['command']])
+                mcp = McpClient(command)
+                for tool in mcp.request('tools/list', {})['tools']:
+                    _local.schemas.append({'type': 'function', 'function': {
+                        'name': 'mcp__' + tool['name'], 'description': tool.get('description', ''),
+                        'parameters': tool['inputSchema']}})
+                _local.mcp = mcp
+    except Exception:
+        if mcp:
+            mcp.close()
+        yield {'type': 'error', 'text': 'MCP 连接失败，请检查 mcp.json'}
+        return
+    try:
+        trace = Trace(trace_dir or DATA / '.runs', [config().get('DEEPSEEK_API_KEY', '')])
         trace.add({'type': 'start', 'task': task, 'workspace': str(workspace),
                    'model_mode': 'live' if model is chat else 'test-double'})
     except OSError:
@@ -83,6 +110,10 @@ def run(task, workspace, cancel=None, model=chat, max_steps=12, trace_dir=None):
     finally:
         if trace:
             trace.close()
+        if mcp:
+            mcp.close()
+        _local.schemas = SCHEMAS
+        _local.mcp = None
 
 
 def _run(task, workspace, cancel=None, model=chat, max_steps=12):
@@ -117,8 +148,12 @@ def _run(task, workspace, cancel=None, model=chat, max_steps=12):
                 return
             yield {'type': 'tool_start', 'name': name, 'arguments': raw}
             try:
-                result = tools.call(name, json.loads(raw))
-                error = False
+                if name.startswith('mcp__') and getattr(_local, 'mcp', None):
+                    result = _local.mcp.request('tools/call', {'name': name[5:], 'arguments': json.loads(raw)})
+                    error = bool(result.get('isError'))
+                else:
+                    result = tools.call(name, json.loads(raw))
+                    error = False
             except Exception as e:
                 result = {'error': str(e)}
                 error = True

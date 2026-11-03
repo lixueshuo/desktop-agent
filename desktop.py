@@ -6,7 +6,7 @@ import threading
 from agent.runtime import run
 from agent.tools import Tools
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT / '.desktop-deps'))
 
 
@@ -78,6 +78,15 @@ class FileApi:
 
 
 if __name__ == '__main__':
+    if '--mcp-server' in sys.argv:
+        import os
+        if sys.stdin is None:
+            sys.stdin = os.fdopen(0, 'r', encoding='utf-8')
+        if sys.stdout is None:
+            sys.stdout = os.fdopen(1, 'w', encoding='utf-8')
+        import runpy
+        runpy.run_path(str(ROOT / 'examples' / 'mcp_server.py'), run_name='__main__')
+        raise SystemExit(0)
     try:
         import webview
     except ImportError:
