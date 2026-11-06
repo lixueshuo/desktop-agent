@@ -8,7 +8,7 @@
 <main><section><h2>项目文件</h2><nav id="files"></nav></section><section><h2 id="filename">选择文件查看内容</h2><pre id="code">左侧点击文件，查看带行号的代码。</pre><p id="remaining"></p></section><section><h2>助手</h2><p>输入任务后，实际工具调用和修改差异会显示在下方。</p><textarea id="task" placeholder="例如：检查 stats.py 并运行测试"></textarea><button id="send" disabled>发送任务</button><button id="stop" disabled>中断</button><div id="events" aria-live="polite"></div><p id="status" role="status"></p></section></main>
 <script>
 const el=id=>document.getElementById(id);
-window.addEventListener('pywebviewready',async()=>{
+async function refreshFiles(){el('files').replaceChildren();
  try{
   el('send').disabled=false;
   const data=await window.pywebview.api.files();el('workspace').textContent=data.workspace;
@@ -17,7 +17,8 @@ window.addEventListener('pywebviewready',async()=>{
    el('files').appendChild(b);
   }el('status').textContent=`已列出 ${data.files.length} 个文件（最多300个）`;
  }catch(e){el('status').textContent='无法读取项目文件';}
-});
+}
+window.addEventListener('pywebviewready',refreshFiles);
 
 let polling=false;
 function record(text,error=false){const p=document.createElement('pre');p.textContent=text;if(error)p.className='error';el('events').appendChild(p);p.scrollIntoView({block:'nearest'});}
@@ -40,5 +41,5 @@ setInterval(async()=>{
 },200);
 
 el('settings').onclick=()=>{const dialog=document.createElement('dialog');dialog.innerHTML='<form><h2>配置 DeepSeek</h2><p>密钥仅保存在本机，请勿填写到聊天中。</p><input name="key" type="password" autocomplete="off" placeholder="API Key" required><input name="model" value="deepseek-flash" required><button>保存</button><button type="button" id="dismiss">取消</button></form>';document.body.appendChild(dialog);dialog.querySelector('#dismiss').onclick=()=>dialog.remove();dialog.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const r=await window.pywebview.api.save_settings(f.get('key'),f.get('model'));if(r.error){alert(r.error);return;}dialog.remove();el('status').textContent='配置已保存在本机';};dialog.showModal();};
-el('choose').onclick=async()=>{const r=await window.pywebview.api.choose_workspace();if(r.error){el('status').textContent=r.error;return;}location.reload();};
+el('choose').onclick=async()=>{const r=await window.pywebview.api.choose_workspace();if(r.error){el('status').textContent=r.error;return;}await refreshFiles();el('code').textContent='请选择文件';el('filename').textContent='选择文件查看内容';};
 </script></html>
