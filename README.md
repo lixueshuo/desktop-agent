@@ -1,5 +1,9 @@
 # Desktop Agent
 
+当前版本 v1.0.1：黑色工作台、底部对话输入、按需展开代码预览。
+
+![黑色工作台](docs/screenshots/dark-workspace.png)
+
 Python + pywebview 桌面编程助手，AI 辅助开发。四个内置工具、模型循环、事件记录及独立 MCP 时间服务已接通。
 
 ## 三步使用
