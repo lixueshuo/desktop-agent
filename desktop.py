@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 import queue
 import threading
-from agent.runtime import run
+from agent.runtime import run, DATA
 from agent.tools import Tools
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
@@ -52,6 +52,25 @@ class FileApi:
         self._cancel.set()
         return {'requested': True}
 
+    def save_settings(self, key, model='deepseek-flash'):
+        if not isinstance(key, str) or not key.strip() or '\n' in key or '\r' in key:
+            return {'error': '请填写有效密钥'}
+        if not isinstance(model, str) or not model.strip() or any(c in model for c in '\r\n'):
+            return {'error': '模型名称无效'}
+        from agent.tools import Tools
+        Tools(DATA)._save(DATA / '.env', 'DEEPSEEK_API_KEY=' + key.strip() + '\nDEEPSEEK_BASE_URL=https://api.deepseek.com\nDEEPSEEK_MODEL=' + model.strip() + '\n')
+        return {'saved': True}
+
+    def choose_workspace(self):
+        with self._lock:
+            if self._busy:
+                return {'error': '请先结束当前任务'}
+            import webview
+            selected = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
+            if selected:
+                self.workspace = Path(selected[0]).resolve()
+        return self.files()
+
     def files(self):
         items = []
         def visit(folder, depth=0):
@@ -92,5 +111,5 @@ if __name__ == '__main__':
     except ImportError:
         raise SystemExit('请先安装依赖：python -m pip install --target .desktop-deps pywebview')
     webview.create_window('Desktop Agent · 正式界面预览',
-                          str(ROOT / 'ui' / 'index.html'), js_api=FileApi(), width=1200, height=800)
+                          html=(ROOT / 'ui' / 'index.html').read_text(encoding='utf-8'), js_api=FileApi(), width=1200, height=800)
     webview.start()
