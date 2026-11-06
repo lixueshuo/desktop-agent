@@ -53,3 +53,8 @@ report.md：架构与取舍。docs/trace.md：真实失败恢复。docs/build.md
 ![安装后的窗口](docs/screenshots/01-installed.png)
 ![带行号的代码预览](docs/screenshots/02-preview.png)
 ![真实 MCP 调用结果](docs/screenshots/03-mcp-result.png)
+
+
+## 新版分步骤演示视频
+
+demo.mp4 已更新为黑色 v1.0.1 安装版的9章节教学视频，约2分22秒，包含配置入口、工作区、代码预览、任务输入、读写记录、修改失败恢复、MCP 与结果总结。采用真实操作截图与中文步骤字幕制作，无配音，不是连续实时录屏。
