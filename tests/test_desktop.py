@@ -11,7 +11,7 @@ class DesktopBridgeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             api = FileApi(folder)
             entered = threading.Event()
-            def fake_run(task, workspace, cancel):
+            def fake_run(task, workspace, cancel, **kwargs):
                 entered.set()
                 cancel.wait(2)
                 yield {'type': 'cancelled'}

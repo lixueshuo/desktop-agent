@@ -55,11 +55,13 @@ SYSTEM = '''你是本地编程助手。先读取相关文件，再做最小修�
 失败应说明证据和原因。回答使用中文。'''
 
 
-def run(task, workspace, cancel=None, model=chat, max_steps=12, trace_dir=None):
+def run(task, workspace, cancel=None, model=chat, max_steps=12, trace_dir=None, allow_commands=True):
     from .trace import Trace
     trace = None
     mcp = None
     _local.schemas = list(SCHEMAS)
+    if not allow_commands:
+        _local.schemas = [s for s in _local.schemas if s['function']['name'] != 'bash']
     _local.mcp = None
     try:
         cfg_path = ROOT / 'mcp.json'
@@ -91,7 +93,7 @@ def run(task, workspace, cancel=None, model=chat, max_steps=12, trace_dir=None):
         trace = None
         yield {'type': 'trace_warning', 'text': '无法保存运行记录，本次任务仍继续'}
     try:
-        for event in _run(task, workspace, cancel, model, max_steps):
+        for event in _run(task, workspace, cancel, model, max_steps, allow_commands):
             if trace:
                 try:
                     trace.add(event)
@@ -116,7 +118,7 @@ def run(task, workspace, cancel=None, model=chat, max_steps=12, trace_dir=None):
         _local.mcp = None
 
 
-def _run(task, workspace, cancel=None, model=chat, max_steps=12):
+def _run(task, workspace, cancel=None, model=chat, max_steps=12, allow_commands=True):
     cancel = cancel or threading.Event()
     tools = Tools(workspace, cancel)
     messages = [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': task}]
@@ -148,6 +150,8 @@ def _run(task, workspace, cancel=None, model=chat, max_steps=12):
                 return
             yield {'type': 'tool_start', 'name': name, 'arguments': raw}
             try:
+                if name == 'bash' and not allow_commands:
+                    raise ValueError('本次任务未开启项目命令执行')
                 if name.startswith('mcp__') and getattr(_local, 'mcp', None):
                     result = _local.mcp.request('tools/call', {'name': name[5:], 'arguments': json.loads(raw)})
                     error = bool(result.get('isError'))

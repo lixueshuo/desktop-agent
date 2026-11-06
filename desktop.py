@@ -4,6 +4,7 @@ import sys
 import os
 import queue
 import threading
+import hashlib
 from agent.runtime import run, DATA
 from agent.tools import Tools
 
@@ -19,7 +20,7 @@ class FileApi:
         self._lock = threading.Lock()
         self._busy = False
 
-    def start_task(self, task):
+    def start_task(self, task, allow_commands=False):
         if not isinstance(task, str) or not task.strip() or len(task) > 20000:
             return {'error': '请输入 1–20000 字符的任务'}
         with self._lock:
@@ -29,7 +30,7 @@ class FileApi:
             self._cancel = threading.Event()
         def worker():
             try:
-                for event in run(task, self.workspace, self._cancel):
+                for event in run(task, self.workspace, self._cancel, allow_commands=bool(allow_commands)):
                     self._events.put(event)
             except Exception as e:
                 self._events.put({'type': 'error', 'text': str(e)})
@@ -95,6 +96,34 @@ class FileApi:
             return result if isinstance(result, dict) else {'text': '图片预览尚未接入'}
         except Exception as e:
             return {'error': str(e)}
+
+    def editor_read(self, path):
+        try:
+            tools = Tools(self.workspace)
+            p = tools._existing_text_path(path)
+            if p.stat().st_size > 500000:
+                raise ValueError('编辑器仅打开500KB以内的文本文件')
+            raw = p.read_bytes()
+            return {'content': raw.decode('utf-8-sig'), 'revision': hashlib.sha256(raw).hexdigest()}
+        except Exception as e:
+            return {'error': str(e)}
+
+    def save_file(self, path, content, revision):
+        with self._lock:
+            if self._busy:
+                return {'error': '请先结束智能体任务再保存代码'}
+            try:
+                if not isinstance(content, str) or len(content.encode('utf-8')) > 500000:
+                    raise ValueError('文件内容过大或格式错误')
+                tools = Tools(self.workspace)
+                p = tools._existing_text_path(path)
+                if hashlib.sha256(p.read_bytes()).hexdigest() != revision:
+                    raise ValueError('文件已被其他操作修改，请重新打开后再编辑，避免覆盖')
+                result = tools.write(path, content)
+                result['revision'] = hashlib.sha256(p.read_bytes()).hexdigest()
+                return result
+            except Exception as e:
+                return {'error': str(e)}
 
 
 if __name__ == '__main__':
