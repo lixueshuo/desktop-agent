@@ -1,6 +1,6 @@
 [project]
 name = "desktop-agent"
-version = "1.0.1"
+version = "1.0.2"
 description = "Local desktop coding assistant coursework"
 requires-python = ">=3.14"
 dependencies = ["pywebview==6.2.1"]

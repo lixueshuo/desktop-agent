@@ -1,1 +1,1 @@
-9269ec0888097d9fae37ecc7dd441381182d498566c077d42dc4808ff77a2bd4  DesktopAgent-Setup-1.0.1.exe
+06c622eea2322779ac3f7b4ef52fcfd562a864d42a436e5c8fca10b6fdc0f8dc  DesktopAgent-Setup-1.0.2.exe
