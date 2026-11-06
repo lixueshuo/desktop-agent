@@ -11,7 +11,7 @@ SolidCompression=yes
 WizardStyle=modern
 
 [Files]
-Source: "dist\DesktopAgent\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\release\DesktopAgent\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Desktop Agent"; Filename: "{app}\DesktopAgent.exe"

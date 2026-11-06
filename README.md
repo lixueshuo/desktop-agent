@@ -43,3 +43,9 @@ MCP 示例由 mcp.json 配置，以独立进程运行，模型名称为 mcp__cur
 ## 作业材料
 
 report.md：架构与取舍。docs/trace.md：真实失败恢复。docs/build.md：构建方法。docs/development.md：真实开发记录。现场演示与视频需要使用实际安装版本录制。
+
+## 安装版验收截图
+
+![安装后的窗口](docs/screenshots/01-installed.png)
+![带行号的代码预览](docs/screenshots/02-preview.png)
+![真实 MCP 调用结果](docs/screenshots/03-mcp-result.png)

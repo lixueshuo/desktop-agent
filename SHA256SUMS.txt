@@ -1,0 +1,1 @@
+bd9c93d2db10b0b387b404f347c69a9c1f11d7b502ac0fa49afdc8e495553fb3  DesktopAgent-Setup-1.0.0.exe

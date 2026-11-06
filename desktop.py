@@ -1,6 +1,7 @@
 """正式界面第一阶段：文件列表与只读预览。"""
 from pathlib import Path
 import sys
+import os
 import queue
 import threading
 from agent.runtime import run, DATA
@@ -107,9 +108,11 @@ if __name__ == '__main__':
         runpy.run_path(str(ROOT / 'examples' / 'mcp_server.py'), run_name='__main__')
         raise SystemExit(0)
     try:
+        # Software rendering also works in remote desktops and screen recordings.
+        os.environ.setdefault('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS', '--disable-gpu')
         import webview
     except ImportError:
         raise SystemExit('请先安装依赖：python -m pip install --target .desktop-deps pywebview')
-    webview.create_window('Desktop Agent · 正式界面预览',
+    webview.create_window('Desktop Agent',
                           html=(ROOT / 'ui' / 'index.html').read_text(encoding='utf-8'), js_api=FileApi(), width=1200, height=800)
     webview.start()
